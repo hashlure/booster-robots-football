@@ -1,5 +1,7 @@
 # Booster RL Tasks
+#
 
+This repository is forked from [booster_train](https://github.com/BoosterRobotics/booster_rl_tasks.git), which is introduced AMP to implement natural running and walking in booster K1.
 ## Overview
 
 This repository provides a set of reinforcement learning tasks for Booster robots using [Isaac Lab](https://isaac-sim.github.io/IsaacLab/main/index.html).

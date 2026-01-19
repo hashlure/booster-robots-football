@@ -4,13 +4,40 @@ import torch
 from typing import TYPE_CHECKING, Literal
 
 import isaaclab.utils.math as math_utils
-from isaaclab.assets import Articulation
 from isaaclab.envs.mdp.events import _randomize_prop_by_op
 from isaaclab.managers import SceneEntityCfg
-
+from collections.abc import Sequence
+from isaaclab.assets import Articulation, RigidObject
+from isaaclab.managers import  CurriculumManager
 if TYPE_CHECKING:
-    from isaaclab.envs import ManagerBasedEnv
+    from isaaclab.envs import ManagerBasedEnv, ManagerBasedRLEnv
 
+def apply_curriculum_force(
+    env: ManagerBasedRLEnv,
+    env_ids: Sequence[int],
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+):
+    asset: RigidObject | Articulation = env.scene[asset_cfg.name]
+    if env_ids is None:
+        env_ids = torch.arange(env.scene.num_envs, device=asset.device)
+    force_value = env.curriculum_manager.get_active_iterable_terms(env_ids)[0][1][0]
+
+    weight = torch.clip(asset.data.root_pos_w[:, 2] / 0.57, 0, 1 )
+
+    if force_value is None or force_value <= 0.0:
+        return
+
+
+    num_bodies = len(asset_cfg.body_ids) if isinstance(asset_cfg.body_ids, list) else 1
+    forces = torch.zeros(len(env_ids), num_bodies, 3, device=env.device)
+    torques = torch.zeros_like(forces)
+
+    # forces[:, asset_cfg.body_ids[0], 2] = force_value * weight
+    # forces[:, asset_cfg.body_ids[1], 2] = force_value * (1- weight)
+    forces[:, :, 2] = force_value 
+    force_value *= (1- weight)
+    # 应用
+    asset.set_external_force_and_torque(forces = forces, torques=torques, env_ids=env_ids, body_ids=asset_cfg.body_ids,is_global=True)
 
 def randomize_joint_default_pos(
     env: ManagerBasedEnv,

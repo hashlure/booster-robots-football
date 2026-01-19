@@ -101,6 +101,7 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
     # For replay, we only need the anchor body (Trunk), which is typically at index 0
     body_indexes = [0]  # Default to index 0 for anchor body (Trunk)
     
+    # we dont get motions from motionloarder for amp type algrithms
     motion = MotionLoader(
         motion_file,
         body_indexes,

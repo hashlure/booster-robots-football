@@ -59,7 +59,9 @@ import os
 import time
 import torch
 
-from rsl_rl.runners import OnPolicyRunner
+from rsl_rl.runners import AmpOnPolicyRunner, OnPolicyRunner
+# from rsl_rl.runners import  OnPolicyRunner
+
 
 from isaaclab.envs import (
     DirectMARLEnv,
@@ -137,7 +139,9 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     print(f"[INFO]: Loading model checkpoint from: {resume_path}")
     # load previously trained model
-    ppo_runner = OnPolicyRunner(env, agent_cfg.to_dict(), log_dir=None, device=agent_cfg.device)
+    ppo_runner = AmpOnPolicyRunner(env, agent_cfg.to_dict(), log_dir=None, device=agent_cfg.device)
+    # ppo_runner = OnPolicyRunner(env, agent_cfg.to_dict(), log_dir=None, device=agent_cfg.device)
+
     ppo_runner.load(resume_path)
 
     # obtain the trained policy for inference

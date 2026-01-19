@@ -10,10 +10,27 @@ if TYPE_CHECKING:
 
 from isaaclab.assets import Articulation, RigidObject
 from isaaclab.managers import SceneEntityCfg
+from isaaclab.sensors import ContactSensor,RayCaster
 
 from booster_rl_tasks.tasks.manager_based.beyond_mimic.mdp.commands import MotionCommand
 from booster_rl_tasks.tasks.manager_based.beyond_mimic.mdp.rewards import _get_body_indexes
 
+def bad_stand_orientation(
+    env: ManagerBasedRLEnv, 
+    limit_angle: float, 
+    target_height: float = 0.817,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+    sensor_cfg: SceneEntityCfg | None = None,
+) -> torch.Tensor:
+
+    asset: RigidObject = env.scene[asset_cfg.name]
+    contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
+    forces_z = torch.abs(contact_sensor.data.net_forces_w[:, sensor_cfg.body_ids, 2])
+    feet_on_plane = torch.norm(forces_z, dim=1) > 20
+    height_stand = (asset.data.body_link_pos_w[:, asset_cfg.body_ids, 2] > target_height).squeeze(-1)
+    is_stand = torch.logical_and(feet_on_plane , height_stand)
+    # print(torch.acos(-asset.data.projected_gravity_b[:, 2]).abs())
+    return torch.logical_and(is_stand , torch.acos(-asset.data.projected_gravity_b[:, 2]).abs() > limit_angle)
 
 def bad_anchor_pos(env: ManagerBasedRLEnv, command_name: str, threshold: float) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)

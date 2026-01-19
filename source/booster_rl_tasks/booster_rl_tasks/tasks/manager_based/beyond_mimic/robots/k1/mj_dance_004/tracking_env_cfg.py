@@ -200,6 +200,7 @@ class EventCfg:
 class RewardsCfg:
     """Reward terms for the MDP."""
 
+    stay_alive = RewTerm(func=mdp.stay_alive,weight=2.0)
     motion_global_anchor_pos = RewTerm(
         func=mdp.motion_global_anchor_position_error_exp,
         weight=0.5,
@@ -237,18 +238,10 @@ class RewardsCfg:
         params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*"])},
     )
     undesired_contacts = RewTerm(
-        func=mdp.undesired_contacts,
-        weight=-10.0,
-        params={
-            "sensor_cfg": SceneEntityCfg(
-                "contact_forces",
-                body_names=[
-                    r"^(?!left_foot_link$)(?!right_foot_link$).+$"
-                ],
-            ),
-            "threshold": 1.0,
-        },
-    )
+            func=mdp.undesired_contacts,
+            weight=-10.0,
+            params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names=[".*_Shank", "Head_2"]), "threshold": 1.0},
+        )
 
     motion_foot_ori = RewTerm(
         func=mdp.motion_relative_body_orientation_error_exp,
@@ -310,7 +303,7 @@ class TerminationsCfg:
         func=mdp.bad_motion_body_pos_z_only,
         params={
             "command_name": "motion",
-            "threshold": 0.25,
+            "threshold": 0.5,
             "body_names": [
                 "left_hand_link",
                 "right_hand_link",

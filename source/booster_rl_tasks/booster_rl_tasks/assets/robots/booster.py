@@ -53,12 +53,12 @@ BOOSTER_K1_CFG = ArticulationCfg(
     init_state=ArticulationCfg.InitialStateCfg(
         pos=(0.0, 0.0, 0.57),
         joint_pos={
-            "Left_Shoulder_Roll": -1.3,
-            "Right_Shoulder_Roll": 1.3,
+            "Left_Shoulder_Roll": -1.45,
+            "Right_Shoulder_Roll": 1.45,
         },
         joint_vel={".*": 0.0},
     ),
-    soft_joint_pos_limit_factor=0.9,
+    soft_joint_pos_limit_factor=0.95,
     actuators={
         "legs": DelayedImplicitActuatorCfg(
             max_delay=8,
