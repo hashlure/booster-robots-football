@@ -24,6 +24,8 @@ parser = argparse.ArgumentParser(description="Replay converted motions.")
 parser.add_argument("--motion", type=str, default=None, help="Path to the motion npz file.")
 parser.add_argument("--fps", type=float, default=30.0, help="Target frames per second for replay.")
 parser.add_argument("--save_path", type=str, default=None, help="Path to save the txt file")
+parser.add_argument("--robot", choices=["booster_t1","booster_k1"], default="booster_k1", help="Which robot do you want to retarget")
+
 
 # append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)

@@ -13,7 +13,7 @@
         "*.kit": "toml",
         "*.rst": "restructuredtext"
     },
-    "editor.rulers": [120],
+    // "editor.rulers": [120],
 
     // files to be ignored by the linter
     "files.watcherExclude": {

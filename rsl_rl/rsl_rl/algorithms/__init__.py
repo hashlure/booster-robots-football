@@ -18,8 +18,8 @@
 
 """Implementation of different RL agents."""
 
-from .amp_ppo import AMPPPO
+from .wm_amp_ppo import WMAMPPPO
 from .distillation import Distillation
 from .ppo import PPO
-
-__all__ = ["PPO", "Distillation", "AMPPPO"]
+from .amp_ppo import AMPPPO
+__all__ = ["AMPPPO", "PPO", "Distillation", "WMAMPPPO"]

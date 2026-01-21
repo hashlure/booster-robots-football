@@ -25,6 +25,8 @@ from .normalizer import EmpiricalNormalization
 from .rnd import RandomNetworkDistillation
 from .student_teacher import StudentTeacher
 from .student_teacher_recurrent import StudentTeacherRecurrent
+from .actor_critic_wmp import ActorCriticWMP
+from .depth_predictor import DepthPredictor
 
 __all__ = [
     "ActorCritic",
@@ -34,4 +36,6 @@ __all__ = [
     "StudentTeacher",
     "StudentTeacherRecurrent",
     "Discriminator",
+    "ActorCriticWMP",
+    "DepthPredictor",
 ]
