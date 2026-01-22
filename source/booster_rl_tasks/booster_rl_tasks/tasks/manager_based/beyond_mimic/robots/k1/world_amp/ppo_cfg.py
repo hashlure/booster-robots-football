@@ -15,7 +15,7 @@ class depth_predictor_cfg:
     #  
     resized: tuple= (64, 64)
     update_interval: int= 5  # 5 works without retraining, 8 worse
-    camera_num_envs: int = 1024
+    camera_num_envs: int = 4096
     forward_height_dim: int = 525 
     use_camera: bool = False
 
@@ -26,17 +26,44 @@ class PPORunnerCfg(BaseAMPAgentCfg):
 
     # amp parameter
     amp_reward_coef = 0.3
-    amp_motion_files = ["/root/booster_rl_tasks/booster_assets/motions/K1/motion_amp_expert/walk.txt","/root/booster_rl_tasks/booster_assets/motions/K1/motion_amp_expert/walk2run.txt","/root/booster_rl_tasks/booster_assets/motions/K1/motion_amp_expert/run.txt","/root/booster_rl_tasks/booster_assets/motions/K1/motion_amp_expert/kick.txt","/root/booster_rl_tasks/booster_assets/motions/K1/motion_amp_expert/run2walk.txt"]
+    amp_motion_files = ["/root/booster_rl_tasks/booster_assets/motions/K1/motion_amp_expert/walk_t1.txt"]
     amp_num_preload_transitions = 200000
     amp_task_reward_lerp = 0.7
     amp_discr_hidden_dims = [1024, 512, 256]
     min_normalized_std = [0.05] * 22
-    # depth_predictor = depth_predictor_cfg()
 
-    # latent_dim = 35
-    # wm_latent_dim = 32
-    # wm_encoder_hidden_dims = [64, 64]
+    policy = RslRlPpoActorCriticCfg(
+        class_name="ActorCriticWMP",
+        init_noise_std=1.0,
+        noise_std_type="log",
+        actor_hidden_dims=[512, 256, 128],
+        critic_hidden_dims=[512, 256, 128],
+        activation="elu",
+    )
+    algorithm = RslRlPpoAlgorithmCfg(
+        class_name="WMAMPPPO",
+        value_loss_coef=1.0,
+        use_clipped_value_loss=True,
+        clip_param=0.2,
+        entropy_coef=0.005,
+        num_learning_epochs=5,
+        num_mini_batches=4,
+        learning_rate=1.0e-3,
+        schedule="adaptive",
+        gamma=0.99,
+        lam=0.95,
+        desired_kl=0.01,
+        max_grad_norm=1.0,
+        normalize_advantage_per_mini_batch=False,
+        symmetry_cfg=None,  # RslRlSymmetryCfg()
+        rnd_cfg=None,  # RslRlRndCfg()
+    )
+    depth_predictor = depth_predictor_cfg()
 
-    # prop_dim = 78
-    # height_dim = 121
-    # privileged_dim = 189
+    latent_dim = 35
+    wm_latent_dim = 32
+    wm_encoder_hidden_dims = [64, 64]
+
+    prop_dim = 78
+    height_dim = 121
+    privileged_dim = 189

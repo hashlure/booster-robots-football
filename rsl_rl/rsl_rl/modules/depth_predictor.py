@@ -19,7 +19,7 @@ import torch.nn as nn
 from torch.distributions import Normal
 from torch.nn.modules import rnn
 import torch.nn.functional as F
-from dreamer import tools
+from ..dreamer import tools
 
 class DepthPredictor(nn.Module):
     def __init__(self, forward_heightamp_dim = 525,

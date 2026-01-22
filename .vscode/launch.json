@@ -8,6 +8,7 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+
         {
             "name": "Python: Current File",
             "type": "python",
@@ -26,8 +27,8 @@
             "name": "Python: Train Environment",
             "type": "python",
             "request": "launch",
-            "args" : ["--task", "Isaac-Reach-Franka-v0", "--headless"],
-            "program": "${workspaceFolder}/scripts/reinforcement_learning/rsl_rl/train.py",
+            "args" : ["--task", "Booster-world-AMP-v0", "--headless"],
+            "program": "${workspaceFolder}/scripts/rsl_rl/train.py",
             "console": "integratedTerminal"
         },
         {

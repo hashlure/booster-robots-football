@@ -8,7 +8,7 @@ defaults:
 
   # Environment
   task: 'a1'
-  num_actions: 12
+  num_actions: 23
 
   # Model
   dyn_hidden: 512

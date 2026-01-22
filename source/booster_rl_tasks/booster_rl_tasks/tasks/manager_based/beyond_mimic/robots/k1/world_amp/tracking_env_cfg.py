@@ -65,8 +65,8 @@ class MySceneCfg(InteractiveSceneCfg):
         prim_path="{ENV_REGEX_NS}/Robot/.*", history_length=3, track_air_time=True, force_threshold=10.0, debug_vis=True
     )
     height_scanner:RayCasterCfg = RayCasterCfg(
-        prim_path="{ENV_REGEX_NS}/Robot/base_Link",
-        attach_yaw_only=True,
+        prim_path="{ENV_REGEX_NS}/Robot/Trunk",
+        ray_alignment = "yaw",
         pattern_cfg=patterns.GridPatternCfg(resolution=0.05, size=[0.5, 0.5]), #TODO: adjust size to fit real robot
         debug_vis=False,
         mesh_prim_paths=["/World/ground"],
@@ -262,12 +262,13 @@ class EventCfg:
 class RewardsCfg:
     """Reward terms for the MDP."""
     # -- task
+    alive = RewTerm(func=mdp.stay_alive, weight= 1.0)
     feet_air_time = RewTerm(
         func=mdp.feet_air_time,
         weight= 5.0,
         params={"sensor_cfg": SceneEntityCfg("contact_forces"), "command_name": "base_velocity", "threshold": 0.5 },
     )
-    head_height = RewTerm(func=mdp.tracking_head_height, params={"target_head_height": 0.35 ,"threshold": 0.8179, "std": 0.3, "command_name": "base_velocity", "asset_cfg": SceneEntityCfg("robot", body_names=["Head_2"])}, weight=5.0)
+    # head_height = RewTerm(func=mdp.tracking_head_height, params={"target_head_height": 0.35 ,"threshold": 0.8179, "std": 0.3, "command_name": "base_velocity", "asset_cfg": SceneEntityCfg("robot", body_names=["H2"])}, weight=5.0)
     keep_balance = RewTerm(
         func=mdp.stay_alive,
         weight=1.0
@@ -301,7 +302,7 @@ class RewardsCfg:
     undesired_contacts = RewTerm(
         func=mdp.undesired_contacts,
         weight=-1.0,
-        params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names=[".*_Shank",".*Hip.*", ".*hand.*", ".*Arm.*", "Head_.*", "Trunk"]), "threshold": 1.0},
+        params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names=["AL.*","Shank.*","Hip.*","Trunk"]), "threshold": 1.0},
     )
     # -- optional penalties
     # flat_orientation_l2 = RewTerm(func=mdp.flat_orientation_l2, weight=0.0)

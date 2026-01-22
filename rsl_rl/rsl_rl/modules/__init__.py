@@ -17,7 +17,6 @@
 # and is distributed under the BSD-3-Clause license.
 
 """Definitions for neural-network components for RL-agents."""
-
 from .actor_critic import ActorCritic
 from .actor_critic_recurrent import ActorCriticRecurrent
 from .discriminator import Discriminator

@@ -49,13 +49,13 @@ from rsl_rl.utils.utils import Normalizer
 from rsl_rl.modules import DepthPredictor
 import torch.optim as optim
 
-from dreamer.models import *
+from ..dreamer.models import *
 import ruamel.yaml as yaml
 import argparse
 import pathlib
 import sys
 import collections
-from dreamer import tools
+from ..dreamer import tools
 import datetime
 import uuid
 class WMPRunner:
@@ -130,9 +130,9 @@ class WMPRunner:
         amp_normalizer = Normalizer(amp_data.observation_dim)
         discriminator = AMPDiscriminator(
             amp_data.observation_dim * 2,
-            train_cfg['runner']['amp_reward_coef'],
-            train_cfg['runner']['amp_discr_hidden_dims'], device,
-            train_cfg['runner']['amp_task_reward_lerp']).to(self.device)
+            train_cfg['amp_reward_coef'],
+            train_cfg['amp_discr_hidden_dims'], device,
+            train_cfg['amp_task_reward_lerp']).to(self.device)
 
         # self.discr: AMPDiscriminator = AMPDiscriminator()
         alg_class = eval(self.alg_cfg.pop("class_name"))
@@ -165,7 +165,7 @@ class WMPRunner:
         # world model
         print('Begin construct world model')
         configs = yaml.safe_load(
-            (pathlib.Path(sys.argv[0]).parent.parent.parent / "dreamer/configs.yaml").read_text()
+            (pathlib.Path(sys.argv[0]).parent.parent.parent / "rsl_rl/rsl_rl/dreamer/configs.yaml").read_text()
         )
 
         def recursive_update(base, update):
@@ -298,16 +298,21 @@ class WMPRunner:
 
                     # store the data in buffer into the dataset before reset
                     reset_env_ids = self.env.env.env.reset_buf.nonzero(as_tuple=False).squeeze(-1)
-                    if (len(reset_env_ids) > 0):
+                    world_model_reset_envs_ids = reset_env_ids.cpu().numpy()
+                    if (len(world_model_reset_envs_ids) > 0):
                         for k, v in self.wm_dataset.items():
-                            v[reset_env_ids, :] = self.wm_buffer[k][reset_env_ids].to(self._world_model.device)
+                            if(k == "image"):
+                                for id in world_model_reset_envs_ids:
+                                    v[world_model_reset_envs_ids, :] = self.wm_buffer[k][world_model_reset_envs_ids].to(self._world_model.device)
+                            else:
+                                v[world_model_reset_envs_ids, :] = self.wm_buffer[k][world_model_reset_envs_ids].to(self._world_model.device)
 
-                        self.wm_dataset_size[reset_env_ids] = self.wm_buffer_index[reset_env_ids]
-                        self.wm_buffer_index[reset_env_ids] = 0
+                        self.wm_dataset_size[world_model_reset_envs_ids] = self.wm_buffer_index[world_model_reset_envs_ids]
+                        self.wm_buffer_index[world_model_reset_envs_ids] = 0
                         sum_wm_dataset_size = np.sum(self.wm_dataset_size)
 
-                        wm_action_history[reset_env_ids, :] = 0
-                        wm_is_first[reset_env_ids] = 1
+                        wm_action_history[world_model_reset_envs_ids, :] = 0
+                        wm_is_first[world_model_reset_envs_ids] = 1
 
                     wm_action = wm_action_history.flatten(1)
                     wm_reward += rewards.to(self._world_model.device)
@@ -332,7 +337,7 @@ class WMPRunner:
                                 wm_action[not_reset_env_ids, :].to('cpu')
                             self.wm_buffer["reward"][not_reset_env_ids, self.wm_buffer_index[not_reset_env_ids]] = \
                                 wm_reward[not_reset_env_ids].to('cpu')
-                            self.wm_buffer_index[not_reset_env_ids] += 1
+                            # self.wm_buffer_index[not_reset_env_ids] += 1
 
                         wm_reward[:] = 0
 
@@ -350,9 +355,7 @@ class WMPRunner:
                     # process trajectory history
                     env_ids = dones.nonzero(as_tuple=False).flatten()
                     self.trajectory_history[env_ids] = 0
-                    obs_without_command = torch.concat((obs[:, self.env.privileged_dim:self.env.privileged_dim + 6],
-                                                        obs[:, self.env.privileged_dim + 9:-self.env.height_dim]),
-                                                       dim=1)
+                    obs_without_command = torch.concat((obs[:, 0:6],obs[:, 9:]), dim=1)
                     self.trajectory_history = torch.concat(
                         (self.trajectory_history[:, 1:], obs_without_command.unsqueeze(1)), dim=1)
 
@@ -360,6 +363,8 @@ class WMPRunner:
                         # Book keeping
                         if 'episode' in infos:
                             ep_infos.append(infos['episode'])
+                        elif "log" in infos:
+                            ep_infos.append(infos["log"])
                         cur_reward_sum += rewards
                         cur_episode_length += 1
                         new_ids = (dones > 0).nonzero(as_tuple=False)
@@ -390,11 +395,11 @@ class WMPRunner:
 
             start_time = time.time()
             if (sum_wm_dataset_size > self.wm_config.train_start_steps):
-
-                if(it % self.depth_predictor_cfg["training_interval"] == 0):
-                # Train Depth Predictor
-                    depth_mse_loss = self.train_depth_predictor()
-                    self.writer.add_scalar('DepthPredictor/loss', depth_mse_loss, it)
+                if (self.depth_predictor_cfg["use_camera"]):
+                    if(it % self.depth_predictor_cfg["training_interval"] == 0):
+                    # Train Depth Predictor
+                        depth_mse_loss = self.train_depth_predictor()
+                        self.writer.add_scalar('DepthPredictor/loss', depth_mse_loss, it)
 
                 # Train World Model
                 wm_metrics = self.train_world_model()
