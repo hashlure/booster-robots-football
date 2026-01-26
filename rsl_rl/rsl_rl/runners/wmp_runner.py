@@ -222,11 +222,6 @@ class WMPRunner:
         cur_reward_sum = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
         cur_episode_length = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
         # create buffers for logging extrinsic and intrinsic rewards
-        if self.alg.rnd:
-            erewbuffer = deque(maxlen=100)
-            irewbuffer = deque(maxlen=100)
-            cur_ereward_sum = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
-            cur_ireward_sum = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
         # Ensure all parameters are in-synced
         if self.is_distributed:
             print(f"Synchronizing parameters for rank {self.gpu_global_rank}...")
@@ -269,18 +264,18 @@ class WMPRunner:
             start = time.time()
             # Rollout
             with torch.inference_mode():
+                self.wm_counter = 0
                 for i in range(self.num_steps_per_env):
-                    if (i % self.wm_update_interval == 0):
-                        # world model obs step
-                        wm_embed = self._world_model.encoder(wm_obs)
-                        wm_latent, _ = self._world_model.dynamics.obs_step(wm_latent, wm_action, wm_embed,
-                                                                           wm_obs["is_first"])
-                        wm_feature = self._world_model.dynamics.get_deter_feat(wm_latent)
-                        wm_is_first[:] = 0
-
+                    self.wm_counter += 1
+                    if (self.wm_counter % self.wm_update_interval == 0):
+                        # (a) obs_step  
+                        wm_embed = self._world_model.encoder(wm_obs)  
+                        wm_latent, _ = self._world_model.dynamics.obs_step(wm_latent, wm_action, wm_embed, wm_obs["is_first"])  
+                        wm_feature = self._world_model.dynamics.get_deter_feat(wm_latent)  
+                        wm_is_first[:] = 0  
                     history = self.trajectory_history.flatten(1).to(self.device)
-                    actions = self.alg.act(obs, critic_obs, amp_obs, history, wm_feature.to(self.env.device))
-                    obs, rewards, dones, infos = self.env.step(actions.to(self.env.device))
+                    actions = self.alg.act(obs, critic_obs, amp_obs, history, wm_feature.to(self.device))
+                    obs, rewards, dones, infos = self.env.step(actions.to(self.device))
                     _, extras = self.env.get_observations()
                     next_amp_obs =  extras["observations"].get("amp_observations")
                     critic_obs = extras["observations"][self.privileged_obs_type]
@@ -292,33 +287,31 @@ class WMPRunner:
                     wm_action_history = torch.concat(
                         (wm_action_history[:, 1:], actions.unsqueeze(1).to(self._world_model.device)), dim=1)
                     wm_obs = {
-                        "prop": obs[:,: - self.env.num_actions].to(self._world_model.device),
+                        "prop": obs[:,: -self.env.num_actions].to(self._world_model.device),
                         "is_first": wm_is_first,
                     }
 
                     # store the data in buffer into the dataset before reset
-                    reset_env_ids = self.env.env.env.reset_buf.nonzero(as_tuple=False).squeeze(-1)
-                    world_model_reset_envs_ids = reset_env_ids.cpu().numpy()
-                    if (len(world_model_reset_envs_ids) > 0):
+                    reset_mask = self.env.unwrapped.reset_buf.bool()  
+                    reset_ids = reset_mask.nonzero(as_tuple=False).flatten().cpu().numpy()  
+                    if (len(reset_ids) > 0):
                         for k, v in self.wm_dataset.items():
-                            if(k == "image"):
-                                for id in world_model_reset_envs_ids:
-                                    v[world_model_reset_envs_ids, :] = self.wm_buffer[k][world_model_reset_envs_ids].to(self._world_model.device)
-                            else:
-                                v[world_model_reset_envs_ids, :] = self.wm_buffer[k][world_model_reset_envs_ids].to(self._world_model.device)
+                            v[reset_ids, :] = self.wm_buffer[k][reset_ids].to(self._world_model.device)
 
-                        self.wm_dataset_size[world_model_reset_envs_ids] = self.wm_buffer_index[world_model_reset_envs_ids]
-                        self.wm_buffer_index[world_model_reset_envs_ids] = 0
+                        self.wm_dataset_size[reset_ids] = self.wm_buffer_index[reset_ids]
+                        self.wm_buffer_index[reset_ids] = 0
                         sum_wm_dataset_size = np.sum(self.wm_dataset_size)
 
-                        wm_action_history[world_model_reset_envs_ids, :] = 0
-                        wm_is_first[world_model_reset_envs_ids] = 1
+                        wm_action_history[reset_ids, :] = 0
+                        # wm_reward[reset_ids] = 0  
+                        wm_is_first[reset_ids] = 1  
 
-                    wm_action = wm_action_history.flatten(1)
-                    wm_reward += rewards.to(self._world_model.device)
-
+                    wm_action = wm_action_history.flatten(1)  
+                    wm_reward += rewards.to(self._world_model.device)  
                     # store current step into buffer
-                    if (it % self.wm_update_interval == 0):
+                    if (self.wm_counter % self.wm_update_interval == 0):
+                        
+                        # (b) 累积 reward，构造 action  
                         if (self.depth_predictor_cfg["use_camera"]):
                             forward_heightmap = self.env.get_forward_map().to(self._world_model.device)
                             pred_depth_image = self.depth_predictor(forward_heightmap, wm_obs["prop"])
@@ -328,24 +321,24 @@ class WMPRunner:
                             self.wm_buffer["image"][range(self.depth_predictor_cfg["camera_num_envs"]),
                             self.wm_buffer_index, :] = wm_obs["image"].to('cpu')
                         # not_reset_env_ids = (~dones).nonzero(as_tuple=False).flatten().cpu().numpy()
-                        not_reset_env_ids = (1 - wm_is_first).nonzero(as_tuple=False).flatten().cpu().numpy()
+                        not_reset_env_ids = (1- wm_is_first).nonzero(as_tuple=False).flatten().cpu().numpy()
                         if (len(not_reset_env_ids) > 0):
                             for k, v in wm_obs.items():
                                 if(k != "is_first" and k != "image"):
                                     self.wm_buffer[k][not_reset_env_ids, self.wm_buffer_index[not_reset_env_ids], :] = v[not_reset_env_ids].to('cpu')
-                            self.wm_buffer["action"][not_reset_env_ids, self.wm_buffer_index[not_reset_env_ids], :] = \
-                                wm_action[not_reset_env_ids, :].to('cpu')
-                            self.wm_buffer["reward"][not_reset_env_ids, self.wm_buffer_index[not_reset_env_ids]] = \
-                                wm_reward[not_reset_env_ids].to('cpu')
-                            # self.wm_buffer_index[not_reset_env_ids] += 1
+                            self.wm_buffer["action"][not_reset_env_ids, self.wm_buffer_index[not_reset_env_ids], :] = wm_action[not_reset_env_ids, :].to('cpu')
+                            self.wm_buffer["reward"][not_reset_env_ids, self.wm_buffer_index[not_reset_env_ids]] = wm_reward[not_reset_env_ids].to('cpu')
+                            self.wm_buffer_index[not_reset_env_ids] += 1
 
                         wm_reward[:] = 0
 
                     # Account for terminal states.
-                    terminal_amp_states = extras["observations"].get("amp_observations")[reset_env_ids]
+                    env_ids = dones.nonzero(as_tuple=False).flatten()
+
+                    terminal_amp_states = extras["observations"].get("amp_observations")[env_ids]
 
                     next_amp_obs_with_term = torch.clone(next_amp_obs)
-                    next_amp_obs_with_term[reset_env_ids] = terminal_amp_states
+                    next_amp_obs_with_term[env_ids] = terminal_amp_states
 
                     rewards = self.alg.discriminator.predict_amp_reward(
                         amp_obs, next_amp_obs_with_term, rewards, normalizer=self.alg.amp_normalizer)[0]
@@ -353,7 +346,6 @@ class WMPRunner:
                     self.alg.process_env_step(rewards, dones, infos, next_amp_obs_with_term)
 
                     # process trajectory history
-                    env_ids = dones.nonzero(as_tuple=False).flatten()
                     self.trajectory_history[env_ids] = 0
                     obs_without_command = torch.concat((obs[:, 0:6],obs[:, 9:]), dim=1)
                     self.trajectory_history = torch.concat(
@@ -378,7 +370,7 @@ class WMPRunner:
 
                 # Learning step
                 start = stop
-                self.alg.compute_returns(critic_obs, wm_feature.to(self.env.device))
+                self.alg.compute_returns(critic_obs, wm_feature.to(self.device))
             loss_dict = self.alg.update()
             stop = time.time()
             learn_time = stop - start
@@ -395,17 +387,17 @@ class WMPRunner:
 
             start_time = time.time()
             if (sum_wm_dataset_size > self.wm_config.train_start_steps):
-                if (self.depth_predictor_cfg["use_camera"]):
-                    if(it % self.depth_predictor_cfg["training_interval"] == 0):
-                    # Train Depth Predictor
-                        depth_mse_loss = self.train_depth_predictor()
-                        self.writer.add_scalar('DepthPredictor/loss', depth_mse_loss, it)
+                if(it % self.depth_predictor_cfg["training_interval"] == 0):
+                    pass
+                # Train Depth Predictor
+                    # depth_mse_loss = self.train_depth_predictor()
+                    # self.writer.add_scalar('DepthPredictor/loss', depth_mse_loss, it)
 
                 # Train World Model
                 wm_metrics = self.train_world_model()
                 for name, values in wm_metrics.items():
                     self.writer.add_scalar('World_model/' + name, float(np.mean(values)), it)
-            print('training world model time:', time.time() - start_time)
+                print('training world model time:', time.time() - start_time)
 
 
         # Save the final model after training
@@ -414,12 +406,9 @@ class WMPRunner:
 
     def init_wm_dataset(self):
         self.wm_dataset = {
-            "prop": torch.zeros((self.env.num_envs, int(self.env.max_episode_length / self.wm_update_interval) + 3, self.num_policy_dim -23 ),
-                                device=self._world_model.device),
-            "action": torch.zeros((self.env.num_envs, int(self.env.max_episode_length / self.wm_update_interval) + 3,
-                                   self.env.num_actions * self.wm_update_interval), device=self._world_model.device),
-            "reward": torch.zeros((self.env.num_envs, int(self.env.max_episode_length / self.wm_update_interval) + 3,),
-                                  device=self._world_model.device),
+            "prop": torch.zeros((self.env.num_envs, int(self.env.max_episode_length / self.wm_update_interval) + 3, self.num_policy_dim -23 ), device=self._world_model.device),
+            "action": torch.zeros((self.env.num_envs, int(self.env.max_episode_length / self.wm_update_interval) + 3, self.env.num_actions * self.wm_update_interval), device=self._world_model.device),
+            "reward": torch.zeros((self.env.num_envs, int(self.env.max_episode_length / self.wm_update_interval) + 3,), device=self._world_model.device),
         }
         if (self.depth_predictor_cfg["use_camera"]):
             self.wm_dataset["image"] = torch.zeros(((self.depth_predictor_cfg["camera_num_envs"], int(self.env.max_episode_length / self.wm_update_interval) + 3,)
@@ -431,12 +420,9 @@ class WMPRunner:
         self.wm_dataset_size = np.zeros(self.env.num_envs)
 
         self.wm_buffer = {
-            "prop": torch.zeros((self.env.num_envs, int(self.env.max_episode_length / self.wm_update_interval) + 3, self.num_policy_dim -23),
-                                device='cpu'),
-            "action": torch.zeros((self.env.num_envs, int(self.env.max_episode_length / self.wm_update_interval) + 3,
-                                   self.env.num_actions * self.wm_update_interval), device='cpu'),
-            "reward": torch.zeros((self.env.num_envs, int(self.env.max_episode_length / self.wm_update_interval) + 3,),
-                                  device='cpu'),
+            "prop": torch.zeros((self.env.num_envs, int(self.env.max_episode_length / self.wm_update_interval) + 3, self.num_policy_dim -23),device='cpu'),
+            "action": torch.zeros((self.env.num_envs, int(self.env.max_episode_length / self.wm_update_interval) + 3, self.env.num_actions * self.wm_update_interval), device='cpu'),
+            "reward": torch.zeros((self.env.num_envs, int(self.env.max_episode_length / self.wm_update_interval) + 3,), device='cpu'),
         }
         if (self.depth_predictor_cfg["use_camera"]):
             self.wm_buffer["image"] = torch.zeros(((self.depth_predictor_cfg["camera_num_envs"], int(self.env.max_episode_length / self.wm_update_interval) + 3,)
@@ -449,13 +435,29 @@ class WMPRunner:
 
     def train_depth_predictor(self):
         total_mse_loss = 0
+        available_idx = np.arange(self.env.num_envs)
+        self.wm_buffer["image"] = torch.zeros(((self.depth_predictor_cfg["camera_num_envs"], int(self.env.max_episode_length / self.wm_update_interval) + 3,)
+                                            + self.depth_predictor_cfg["resized"] + (1,)), device='cpu')
+        self.wm_buffer["forward_height_map"] = torch.zeros(
+            (self.env.num_envs, int(self.env.max_episode_length / self.wm_update_interval) + 3,
+                self.depth_predictor_cfg["forward_height_dim"]), device='cpu')
+        self.wm_dataset["image"] = torch.zeros(((self.depth_predictor_cfg["camera_num_envs"], int(self.env.max_episode_length / self.wm_update_interval) + 3,)
+                                            + self.depth_predictor_cfg["resized"] + (1,)), device=self._world_model.device)
+        self.wm_dataset["forward_height_map"] = torch.zeros(
+            (self.env.num_envs, int(self.env.max_episode_length / self.wm_update_interval) + 3,
+                self.depth_predictor_cfg["forward_height_dim"]), device=self._world_model.device)
         for _ in range(self.depth_predictor_cfg["training_iters"]):
-            forward_heightmap = self.wm_dataset["forward_height_map"]
-            prop = self.wm_dataset["prop"]
-            depth_image = self.wm_dataset["image"]
-
+            batch_idx = np.random.choice(available_idx, self.depth_predictor_cfg["batch_size"],
+                                         replace=True)
+            time_index = [np.random.randint(0, self.wm_dataset_size[idx] + 1) for idx in batch_idx]
+            forward_heightmap = self.wm_dataset["forward_height_map"][batch_idx, time_index]
+            prop = self.wm_dataset["prop"][batch_idx, time_index]
+            depth_image = self.wm_dataset["image"][batch_idx, time_index]
+            # print("forward_heightmap",forward_heightmap.shape)
+            # print("prop",prop.shape)
             predict_depth_image = self.depth_predictor(forward_heightmap, prop)
-            depth_predict_loss = (depth_image - predict_depth_image).pow(2).mean() * self.depth_predictor_cfg["loss_scale"]
+            depth_predict_loss = (depth_image - predict_depth_image).pow(2).mean() * self.depth_predictor_cfg[
+                "loss_scale"]
             # Gradient step
             self.depth_predictor_opt.zero_grad()
             depth_predict_loss.backward()
@@ -500,7 +502,7 @@ class WMPRunner:
 
     def log(self, locs: dict, width: int = 80, pad: int = 35):
 
-        # Compute the collection size
+        # Compute the collection size/root/booster_rl_tasks/rsl_rl/rsl_rl/runners/wmp_runner.py
         collection_size = self.num_steps_per_env * self.env.num_envs * self.gpu_world_size
         # Update total time-steps and time
         self.tot_timesteps += collection_size
@@ -604,7 +606,7 @@ class WMPRunner:
 
     def load(self, path, load_optimizer=True, load_wm_optimizer = False):
         loaded_dict = torch.load(path, map_location=self.device)
-        self.alg.actor_critic.load_state_dict(loaded_dict['model_state_dict'], strict=False)
+        self.alg.policy.load_state_dict(loaded_dict['model_state_dict'], strict=False)
         self._world_model.load_state_dict(loaded_dict['world_model_dict'], strict=False)
         if(load_wm_optimizer):
             self._world_model._model_opt._opt.load_state_dict(loaded_dict['wm_optimizer_state_dict'])

@@ -150,7 +150,7 @@ class WMAMPPPO:
         self.normalize_advantage_per_mini_batch = normalize_advantage_per_mini_batch
 
     def init_storage(
-        self, training_type, num_envs, num_transitions_per_env, actor_obs_shape, critic_obs_shape, actions_shape,history_dim, wm_feature_dim
+        self, training_type, num_envs, num_transitions_per_env, actor_obs_shape, critic_obs_shape, actions_shape, history_dim, wm_feature_dim
     ):
         # create memory for RND as well :)
         if self.rnd:
@@ -170,7 +170,12 @@ class WMAMPPPO:
             wm_feature_dim=wm_feature_dim,
             device=self.device,
         )
+    def test_mode(self):
+        self.policy.test()
 
+    def train_mode(self):
+        self.policy.train()
+        
     def act(self, obs, critic_obs, amp_obs, history, wm_feature):
         if self.policy.is_recurrent:
             self.transition.hidden_states = self.policy.get_hidden_states()
@@ -223,7 +228,9 @@ class WMAMPPPO:
 
     def compute_returns(self, last_critic_obs, wm_feature):
         # compute value for the last step
-        last_values = self.policy.evaluate(last_critic_obs, wm_feature).detach()
+        aug_last_critic_obs = last_critic_obs.detach()
+
+        last_values = self.policy.evaluate(aug_last_critic_obs, wm_feature).detach()
         self.storage.compute_returns(
             last_values, self.gamma, self.lam, normalize_advantage=not self.normalize_advantage_per_mini_batch
         )
@@ -390,6 +397,8 @@ class WMAMPPPO:
                 value_loss = (returns_batch - value_batch).pow(2).mean()
 
             loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_batch.mean()
+            # loss = surrogate_loss + self.value_loss_coef * value_loss
+
 
             # Linear vel predict loss
             predicted_linear_vel = self.policy.get_linear_vel(aug_obs_batch, history_batch)

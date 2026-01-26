@@ -24,12 +24,24 @@ from isaaclab.utils import configclass
 from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
 
 import booster_rl_tasks.tasks.manager_based.beyond_mimic.mdp as mdp
+from isaaclab.sensors import CameraCfg, TiledCameraCfg
 
 ##
 # Scene definition
 ##
 
+scale_w = 64 / 640          # = 0.1
+scale_h = 64 / 640          # = 0.1
+fx = 381.507171630859 * scale_w   # 38.1507171630859
+fy = 381.507171630859 * scale_h   # 38.1507171630859
+cx = 322.69091796875   * scale_w   # 32.269091796875
+cy = 237.290618896484 * scale_h   # 23.7290618896484
 
+intrinsics_64x64 = [
+    fx, 0.0, cx,
+    0.0, fy, cy,
+    0.0, 0.0, 1.0,
+]
 @configclass
 class MySceneCfg(InteractiveSceneCfg):
     """Configuration for the terrain scene with a legged robot."""
@@ -72,6 +84,27 @@ class MySceneCfg(InteractiveSceneCfg):
         mesh_prim_paths=["/World/ground"],
     )
 
+    camera = TiledCameraCfg(
+        prim_path="{ENV_REGEX_NS}/Robot/H2/d435i",
+        update_period=0.05,
+        height=64,
+        width=64,
+        data_types=["rgb", "distance_to_image_plane"],
+        spawn=sim_utils.PinholeCameraCfg.from_intrinsic_matrix(
+            intrinsic_matrix=intrinsics_64x64,
+            width=64,
+            height=64,
+            focal_length=1.93,# 1.93 mm
+            clipping_range=(0.01, 10.0),
+            focus_distance=400.0,        # sasame
+        ),
+        offset=TiledCameraCfg.OffsetCfg(
+            pos=(0.1, 0, 0.1),
+            rot=(1, 0.0, 0, 0.0),
+            convention="world",
+        ),
+    )
+
 ##
 # MDP settings
 ##
@@ -90,7 +123,7 @@ class CommandsCfg:
         heading_control_stiffness=0.5,
         debug_vis=True,
         ranges=mdp.UniformVelocityCommandCfg.Ranges(
-            lin_vel_x=(0.0, 2.0), lin_vel_y=(0.0, 0.0), ang_vel_z=(-0.3, 0.3)
+            lin_vel_x=(0.0, 1.0), lin_vel_y=(0.0, 0.0), ang_vel_z=(-0.5, 0.5)
         ),
     )
 
@@ -136,7 +169,9 @@ class ObservationsCfg:
 
         # last action
         actions = ObsTerm(func=mdp.last_action, clip=(-100.0, 100.0), scale=1.0,)
-        heights = ObsTerm(func=mdp.height_scan,params={"sensor_cfg": SceneEntityCfg("height_scanner")})
+        heights = ObsTerm(func=mdp.height_scan, params = {"sensor_cfg": SceneEntityCfg("height_scanner")},
+                    noise=GaussianNoise(mean=0.0, std=0.01),
+                    clip = (0.0, 10.0))
         
         # Privileged observation
         robot_joint_torque = ObsTerm(func=mdp.robot_joint_torque)
@@ -262,7 +297,6 @@ class EventCfg:
 class RewardsCfg:
     """Reward terms for the MDP."""
     # -- task
-    alive = RewTerm(func=mdp.stay_alive, weight= 1.0)
     feet_air_time = RewTerm(
         func=mdp.feet_air_time,
         weight= 5.0,
@@ -273,6 +307,8 @@ class RewardsCfg:
         func=mdp.stay_alive,
         weight=1.0
     )
+    pen_base_height = RewTerm(func=mdp.base_height_l2, params={"target_height": 0.75}, weight=-2.0)
+
     stand_still = RewTerm(
         func=mdp.stand_still,
         weight= -0.5,

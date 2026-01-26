@@ -54,7 +54,7 @@ class WM_RolloutStorage:
         privileged_obs_shape,
         actions_shape,
         rnd_state_shape=None,
-        history_dim = 78 * 5,
+        history_dim = 75 * 5,
         wm_feature_dim = 1536,
         device="cpu",
     ):
@@ -119,6 +119,9 @@ class WM_RolloutStorage:
         self.actions[self.step].copy_(transition.actions)
         self.rewards[self.step].copy_(transition.rewards.view(-1, 1))
         self.dones[self.step].copy_(transition.dones.view(-1, 1))
+        # very important !!!
+        self.history[self.step].copy_(transition.history)
+        self.wm_features[self.step].copy_(transition.wm_feature)
 
         # for distillation
         if self.training_type == "distillation":

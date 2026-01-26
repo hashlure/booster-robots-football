@@ -28,7 +28,7 @@ class FlatWoStateEstimationEnvCfg(FlatEnvCfg):
 class RoughWoStateEstimationEnvCfg(FlatWoStateEstimationEnvCfg):
     def __post_init__(self):
         super().__post_init__()
-
+        self.scene.height_scanner.update_period = self.decimation * self.sim.dt
         self.scene.terrain.terrain_type = "generator"
         self.scene.terrain.debug_vis = False        # 设为True可视化地形分布
         self.scene.terrain.terrain_generator = TerrainGeneratorCfg(
