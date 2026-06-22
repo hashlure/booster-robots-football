@@ -341,6 +341,3 @@ for a in BOOSTER_T1_CFG.actuators.values():
     for n in names:
         if n in e and n in s and s[n]:
             T1_ACTION_SCALE[n] = 0.25 * e[n] / s[n]
-            
-print(f'{BOOSTER_T1_CFG.actuators=}')
-print(f'{T1_ACTION_SCALE=}')

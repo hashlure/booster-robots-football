@@ -61,6 +61,17 @@ _build
 # Pre-Trained Checkpoints
 /.pretrained_checkpoints/
 
+# Large data / motion / model files
+**/motions/
+**/*.csv
+**/*.STL
+**/*.stl
+**/*.pt
+**/*.pdf
+**/yyy_conversation/
+**/gpufree-data/
+**/gpufree_data/
+
 # Teleop Recorded Dataset
 datasets
 

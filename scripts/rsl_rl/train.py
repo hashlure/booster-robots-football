@@ -179,8 +179,15 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     # wrap around environment for rsl-rl
     env = RslRlVecEnvWrapper(env, clip_actions=agent_cfg.clip_actions)
     # create runner from rsl-rl
-    runner = WMPRunner(env, agent_cfg.to_dict(), log_dir=log_dir, device=agent_cfg.device)
-    # runner = OnPolicyRunner(env, agent_cfg.to_dict(), log_dir=log_dir, device=agent_cfg.device)
+    runner_class_map = {
+        "OnPolicyRunner": OnPolicyRunner,
+        "AmpOnPolicyRunner": AmpOnPolicyRunner,
+        "WMPRunner": WMPRunner,
+    }
+    runner_class_name = getattr(agent_cfg, "runner_class_name", "OnPolicyRunner")
+    runner_cls = runner_class_map.get(runner_class_name, OnPolicyRunner)
+    print(f"[INFO] Using runner: {runner_cls.__name__}")
+    runner = runner_cls(env, agent_cfg.to_dict(), log_dir=log_dir, device=agent_cfg.device)
 
     # write git state to logs
     runner.add_git_repo_to_log(__file__)
@@ -189,6 +196,11 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         print(f"[INFO]: Loading model checkpoint from: {resume_path}")
         # load previously trained model
         runner.load(resume_path)
+        # 课程学习：将 resume 前的步数补偿给环境，保证 phase 判断正确
+        resume_offset = runner.current_learning_iteration * env.unwrapped.num_envs * agent_cfg.num_steps_per_env
+        env.unwrapped._resume_step_offset = resume_offset
+        print(f"[INFO] Curriculum resume offset: {resume_offset} steps "
+              f"(≈ iteration {runner.current_learning_iteration})")
 
     # dump the configuration into log-directory
     dump_yaml(os.path.join(log_dir, "params", "env.yaml"), env_cfg)

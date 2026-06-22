@@ -107,14 +107,20 @@ class AmpOnPolicyRunner:
             self.alg_cfg["symmetry_cfg"]["_env"] = env
 
         # init amp loader
+        # robustly get inner env across different wrapper chains
+        _env = self.env
+        while not hasattr(_env, 'step_dt') and hasattr(_env, 'env'):
+            _env = _env.env
+        self._inner_env = _env  # store for later use (e.g., reset_buf)
+        _step_dt = getattr(_env, 'step_dt', 0.02)  # fallback to 0.02 (50Hz)
         amp_data = AMPLoader(
             device,
-            time_between_frames=self.env.env.env.step_dt,
+            time_between_frames=_step_dt,
             preload_transitions=True,
             num_preload_transitions=train_cfg["amp_num_preload_transitions"],
             motion_files=train_cfg["amp_motion_files"],
         )
-        print(self.env.env.env.step_dt)
+        print(_step_dt)
         
         amp_normalizer = Normalizer(amp_data.observation_dim)
         discriminator = Discriminator(
@@ -254,6 +260,7 @@ class AmpOnPolicyRunner:
                     obs, rewards, dones, next_amp_obs = (
                         obs.to(self.device),
                         rewards.to(self.device),
+
                         dones.to(self.device),
                         next_amp_obs.to(self.device),
                     )
@@ -268,7 +275,7 @@ class AmpOnPolicyRunner:
 
                     # Account for terminal state transitions
                     next_amp_obs_with_term = torch.clone(next_amp_obs)
-                    reset_env_ids = self.env.env.env.reset_buf.nonzero(as_tuple=False).squeeze(-1)
+                    reset_env_ids = self._inner_env.reset_buf.nonzero(as_tuple=False).squeeze(-1)
 
                     terminal_amp_states = extras["observations"].get("amp_observations")[reset_env_ids]
                     next_amp_obs_with_term[reset_env_ids] = terminal_amp_states
