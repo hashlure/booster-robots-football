@@ -7,7 +7,7 @@ class PPORunnerCfg(Walk2RunPPORunnerCfg):
     """T1 walk2run — 继承 K1 配置，关 AMP，纯 PPO。"""
 
     experiment_name = "walk2run_ppo_t1"
-    amp_reward_coef = 0.1
+    amp_reward_coef = 0.3
     min_normalized_std = [0.05] * 23
 
     T1_AMASS_DIR = "/root/gpufree-data/GVHMR_outputs/demo/T1/amass"

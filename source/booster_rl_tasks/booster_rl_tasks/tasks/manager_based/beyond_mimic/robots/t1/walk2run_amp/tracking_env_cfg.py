@@ -1,9 +1,12 @@
-"""T1 walk2run — 仅覆盖 K1 版中 body name 不同的奖励项。"""
+"""T1 walk2run — body name 适配 + sim2real 域随机化。"""
 
 from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.utils import configclass
-from ...k1.walk2run_amp.tracking_env_cfg import RewardsCfg as BaseRewardsCfg, TrackingEnvCfg as BaseTrackingEnvCfg
+from ...k1.walk2run_amp.tracking_env_cfg import (
+    RewardsCfg as BaseRewardsCfg,
+    TrackingEnvCfg as BaseTrackingEnvCfg,
+)
 import booster_rl_tasks.tasks.manager_based.beyond_mimic.mdp as mdp
 
 
@@ -18,7 +21,6 @@ class RewardsCfg(BaseRewardsCfg):
             "threshold": 0.5,
         },
     )
-    # T1 头部高度 → 权重归零（正确站姿给奖励=奖赏不动，改用 base_height 惩罚）
     head_height = RewTerm(func=mdp.tracking_head_height,
         params={"target_head_height": 0.40, "threshold": 0.92, "std": 0.3,
                 "command_name": "base_velocity",
@@ -26,18 +28,14 @@ class RewardsCfg(BaseRewardsCfg):
         weight=0.0)
     base_height_l2 = RewTerm(func=mdp.base_height_l2,
         params={"target_height": 0.68}, weight=-5.0)
-    # 杀死不动策略
     keep_balance = RewTerm(func=mdp.stay_alive, weight=0.1)
-    # 线速度跟踪提到 3.0，成为最大单一正向奖励
     track_lin_vel_xy_exp = RewTerm(
         func=mdp.track_lin_vel_xy_exp, weight=3.0, params={"command_name": "base_velocity", "std": 0.7071}
     )
-    # 关掉角速度跟踪和静止惩罚
     track_ang_vel_z_exp = RewTerm(
         func=mdp.track_ang_vel_z_exp, weight=0.0, params={"command_name": "base_velocity", "std": 0.7071}
     )
     stand_still = RewTerm(func=mdp.stand_still, weight=0.0, params={"command_name": "base_velocity"})
-    # T1 不该碰地的部位
     undesired_contacts = RewTerm(
         func=mdp.undesired_contacts,
         weight=-1.0,
@@ -47,6 +45,28 @@ class RewardsCfg(BaseRewardsCfg):
     )
 
 
+# ============================================================
+# Sim2Real 五阶段课程
+# ============================================================
+# Phase 1 (0-1500):  学走路 — 低速、无转向、无扰动，轻度惩罚
+#   env_cfg: ang_vel_z=(0,0), lin_vel_x=(0.3, 0.8)
+# Phase 2 (1500-3000): 加转向 — 开启角速度指令
+#   env_cfg: ang_vel_z=(-0.3, 0.3), lin_vel_x=(0.5, 1.5)
+# Phase 3 (3000-5000): 抗小扰 — 轻度推力，关节偏移
+#   取消下面 Phase3 注释块，events: EventCfg3 = EventCfg3()
+# Phase 4 (5000-7000): 大速度 — 高速指令，中等扰动
+#   env_cfg: lin_vel_x=(1.0, 2.5)
+#   取消下面 Phase4 注释块，events: EventCfg4 = EventCfg4()
+# Phase 5 (7000+):     抗大扰 — 强随机化 + 强关节惩罚
+#   取消下面 Phase5 注释块，events: EventCfg5 = EventCfg5()
+#   同时加大 dof_acc, action_rate 惩罚
+# ============================================================
+
+
 @configclass
 class TrackingEnvCfg(BaseTrackingEnvCfg):
     rewards: RewardsCfg = RewardsCfg()
+    # Phase 3-5 按需取消下面注释：
+    # events: EventCfg3 = EventCfg3()
+    # events: EventCfg4 = EventCfg4()
+    # events: EventCfg5 = EventCfg5()
