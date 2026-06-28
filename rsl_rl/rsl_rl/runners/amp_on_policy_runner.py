@@ -502,13 +502,16 @@ class AmpOnPolicyRunner:
             if resumed_training:
                 # if a previous training is resumed, the actor/student normalizer is loaded for the actor/student
                 # and the critic/teacher normalizer is loaded for the critic/teacher
-                self.obs_normalizer.load_state_dict(loaded_dict["obs_norm_state_dict"])
-                self.privileged_obs_normalizer.load_state_dict(loaded_dict["privileged_obs_norm_state_dict"])
+                if "obs_norm_state_dict" in loaded_dict:
+                    self.obs_normalizer.load_state_dict(loaded_dict["obs_norm_state_dict"])
+                if "privileged_obs_norm_state_dict" in loaded_dict:
+                    self.privileged_obs_normalizer.load_state_dict(loaded_dict["privileged_obs_norm_state_dict"])
             else:
                 # if the training is not resumed but a model is loaded, this run must be distillation training following
                 # an rl training. Thus the actor normalizer is loaded for the teacher model. The student's normalizer
                 # is not loaded, as the observation space could differ from the previous rl training.
-                self.privileged_obs_normalizer.load_state_dict(loaded_dict["obs_norm_state_dict"])
+                if "obs_norm_state_dict" in loaded_dict:
+                    self.privileged_obs_normalizer.load_state_dict(loaded_dict["obs_norm_state_dict"])
         # -- load optimizer if used
         if load_optimizer and resumed_training:
             # -- algorithm optimizer

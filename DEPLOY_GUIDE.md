@@ -21,12 +21,14 @@ Isaac Lab 内部使用 PhysX BFS 顺序排列关节，deploy SDK 使用串口顺
 在部署端 `policy_*.py` 的观测构建和动作输出处，加入双向重排：
 
 ```python
-# SDK 串口顺序 → Isaac Lab PhysX BFS 顺序
-isaac_from_sdk = [0,2,6,10,1,3,7,11,17,4,8,12,18,5,9,13,19,14,20,15,21,16,22]
-sdk_from_isaac = np.argsort(isaac_from_sdk)
+# 双向重排 (SDK serial ↔ Isaac Lab PhysX BFS)
+# sdk_from_isaac[isaac_i] = sdk_i → 观测 SDK→Isaac: dof_pos[sdk_from_isaac]
+sdk_from_isaac = [0,2,6,10,1,3,7,11,17,4,8,12,18,5,9,13,19,14,20,15,21,16,22]
+# isaac_from_sdk[sdk_i] = isaac_i → 动作 Isaac→SDK: actions[isaac_from_sdk]
+isaac_from_sdk = np.argsort(sdk_from_isaac)
 
-# 观测: dof_pos[isaac_from_sdk], dof_vel[isaac_from_sdk]
-# 动作: actions[sdk_from_isaac]
+# 观测: dof_pos[sdk_from_isaac], dof_vel[sdk_from_isaac]
+# 动作: actions[isaac_from_sdk]
 ```
 
 ---

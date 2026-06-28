@@ -87,3 +87,31 @@ def modify_reward_weight(env: ManagerBasedRLEnv, env_ids: Sequence[int], term_na
         # update term settings
         term_cfg.weight = weight
         env.reward_manager.set_term_cfg(term_name, term_cfg)
+
+
+def command_range_curriculum(
+    env: ManagerBasedRLEnv,
+    env_ids: Sequence[int],
+    command_name: str,
+    ranges: list[dict],
+):
+    """Update velocity command ranges according to the current env step."""
+    del env_ids
+    command = env.command_manager.get_term(command_name)
+    effective_step = env.common_step_counter + getattr(env, "_resume_step_offset", 0)
+    active = ranges[0]
+    for stage in ranges:
+        if effective_step >= stage["num_steps"]:
+            active = stage
+
+    command.cfg.ranges.lin_vel_x = tuple(active["lin_vel_x"])
+    command.cfg.ranges.lin_vel_y = tuple(active["lin_vel_y"])
+    command.cfg.ranges.ang_vel_z = tuple(active["ang_vel_z"])
+
+    return {
+        "effective_step": effective_step,
+        "stage_step": active["num_steps"],
+        "lin_vel_x_max": active["lin_vel_x"][1],
+        "lin_vel_y_max": active["lin_vel_y"][1],
+        "ang_vel_z_max": active["ang_vel_z"][1],
+    }

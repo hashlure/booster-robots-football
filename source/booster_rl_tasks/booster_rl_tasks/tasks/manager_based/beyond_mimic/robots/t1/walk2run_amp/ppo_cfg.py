@@ -16,7 +16,9 @@ class PPORunnerCfg(Walk2RunPPORunnerCfg):
         f"{T1_AMASS_DIR}/07_walk/07_02_stageii.txt",
         f"{T1_AMASS_DIR}/07_walk/07_03_stageii.txt",
         f"{T1_AMASS_DIR}/07_walk/07_04_stageii.txt",
-        # f"{T1_AMASS_DIR}/09_run/09_04_stageii.txt",
-        # f"{T1_AMASS_DIR}/09_run/09_10_stageii.txt",
+        f"{T1_AMASS_DIR}/09_run/09_04_stageii.txt",
+        f"{T1_AMASS_DIR}/09_run/09_10_stageii.txt",
+        f"/root/GVHMR/outputs/demo/T1/amass/35/35_27_stageii.txt",
+        f"/root/GVHMR/outputs/demo/T1/amass/16/16_34_stageii.txt"
         # f"{T1_AMASS_DIR}/09_run/09_12_stageii.txt",
     ]

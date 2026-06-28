@@ -1,5 +1,6 @@
-"""T1 walk2run — body name 适配 + sim2real 域随机化。"""
+"""T1 walk2run — body name 适配 + 单阶段全开命令空间（学 K1）。"""
 
+from isaaclab.managers import CurriculumTermCfg as CurrTerm
 from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.utils import configclass
@@ -33,9 +34,9 @@ class RewardsCfg(BaseRewardsCfg):
         func=mdp.track_lin_vel_xy_exp, weight=3.0, params={"command_name": "base_velocity", "std": 0.7071}
     )
     track_ang_vel_z_exp = RewTerm(
-        func=mdp.track_ang_vel_z_exp, weight=0.0, params={"command_name": "base_velocity", "std": 0.7071}
+        func=mdp.track_ang_vel_z_exp, weight=1.2, params={"command_name": "base_velocity", "std": 0.7071}
     )
-    stand_still = RewTerm(func=mdp.stand_still, weight=0.0, params={"command_name": "base_velocity"})
+    stand_still = RewTerm(func=mdp.stand_still, weight=-0.5, params={"command_name": "base_velocity"})
     undesired_contacts = RewTerm(
         func=mdp.undesired_contacts,
         weight=-1.0,
@@ -46,27 +47,44 @@ class RewardsCfg(BaseRewardsCfg):
 
 
 # ============================================================
-# Sim2Real 五阶段课程
+# Command curriculum — 学 K1，单阶段全开。
 # ============================================================
-# Phase 1 (0-1500):  学走路 — 低速、无转向、无扰动，轻度惩罚
-#   env_cfg: ang_vel_z=(0,0), lin_vel_x=(0.3, 0.8)
-# Phase 2 (1500-3000): 加转向 — 开启角速度指令
-#   env_cfg: ang_vel_z=(-0.3, 0.3), lin_vel_x=(0.5, 1.5)
-# Phase 3 (3000-5000): 抗小扰 — 轻度推力，关节偏移
-#   取消下面 Phase3 注释块，events: EventCfg3 = EventCfg3()
-# Phase 4 (5000-7000): 大速度 — 高速指令，中等扰动
-#   env_cfg: lin_vel_x=(1.0, 2.5)
-#   取消下面 Phase4 注释块，events: EventCfg4 = EventCfg4()
-# Phase 5 (7000+):     抗大扰 — 强随机化 + 强关节惩罚
-#   取消下面 Phase5 注释块，events: EventCfg5 = EventCfg5()
-#   同时加大 dof_acc, action_rate 惩罚
-# ============================================================
+
+
+@configclass
+class CurriculumCfg:
+    command_ranges = CurrTerm(
+        func=mdp.command_range_curriculum,
+        params={
+            "command_name": "base_velocity",
+            "ranges": [
+                {
+                    "num_steps": 0,
+                    "lin_vel_x": (0.0, 2.0),
+                    "lin_vel_y": (0.0, 0.0),
+                    "ang_vel_z": (-0.3, 0.3),
+                },
+            ],
+        },
+    )
 
 
 @configclass
 class TrackingEnvCfg(BaseTrackingEnvCfg):
     rewards: RewardsCfg = RewardsCfg()
-    # Phase 3-5 按需取消下面注释：
-    # events: EventCfg3 = EventCfg3()
-    # events: EventCfg4 = EventCfg4()
-    # events: EventCfg5 = EventCfg5()
+    curriculum: CurriculumCfg = CurriculumCfg()
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.commands.base_velocity.ranges.lin_vel_x = (0.0, 2.0)
+        self.commands.base_velocity.ranges.lin_vel_y = (0.0, 0.0)
+        self.commands.base_velocity.ranges.ang_vel_z = (-0.3, 0.3)
+        # Match the official deploy-friendly observation convention:
+        # policy sees joint positions relative to the action/default offset,
+        # and joint velocities are scaled down to reduce OOD amplification.
+        self.observations.policy.joint_pos.func = mdp.joint_pos_rel
+        self.observations.policy.joint_vel.scale = 0.1
+        self.observations.critic.joint_pos.func = mdp.joint_pos_rel
+        self.observations.critic.joint_vel.scale = 0.1
+
+    # events: EventCfg = EventCfg()  # 需要时取消注释

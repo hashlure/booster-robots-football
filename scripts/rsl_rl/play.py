@@ -134,6 +134,21 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         print_dict(video_kwargs, nesting=4)
         env = gym.wrappers.RecordVideo(env, **video_kwargs)
 
+    # ── DEBUG: fix velocity command to zero (align with MuJoCo initial state) ──
+    raw_env = env.unwrapped if hasattr(env, 'unwrapped') else env
+    if hasattr(raw_env, 'command_manager'):
+        cmd_term = raw_env.command_manager.get_term('base_velocity')
+        cmd_term.cfg.ranges.lin_vel_x = (0.0, 0.0)
+        cmd_term.cfg.ranges.lin_vel_y = (0.0, 0.0)
+        cmd_term.cfg.ranges.ang_vel_z = (0.0, 0.0)
+        cmd_term.cfg.resampling_time_range = (1e9, 1e9)
+        # Force currently active command to zero for all envs
+        if hasattr(cmd_term, 'raw_commands') and cmd_term.raw_commands is not None:
+            cmd_term.raw_commands[:, :] = 0.0
+        print(f'[DEBUG] Velocity command fixed to zero, num_envs={raw_env.num_envs}')
+    else:
+        print(f'[DEBUG] Cannot find command_manager. env type={type(raw_env)}')
+
     # wrap around environment for rsl-rl
     env = RslRlVecEnvWrapper(env, clip_actions=agent_cfg.clip_actions)
 

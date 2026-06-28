@@ -196,11 +196,19 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         print(f"[INFO]: Loading model checkpoint from: {resume_path}")
         # load previously trained model
         runner.load(resume_path)
+        if hasattr(runner.alg, "optimizer"):
+            for param_group in runner.alg.optimizer.param_groups:
+                param_group["lr"] = agent_cfg.algorithm.learning_rate
+            print(f"[INFO] Optimizer learning rate reset to config value: {agent_cfg.algorithm.learning_rate}")
         # 课程学习：将 resume 前的步数补偿给环境，保证 phase 判断正确
-        resume_offset = runner.current_learning_iteration * env.unwrapped.num_envs * agent_cfg.num_steps_per_env
+        resume_offset = runner.current_learning_iteration * agent_cfg.num_steps_per_env
         env.unwrapped._resume_step_offset = resume_offset
         print(f"[INFO] Curriculum resume offset: {resume_offset} steps "
               f"(≈ iteration {runner.current_learning_iteration})")
+        if hasattr(env.unwrapped, "curriculum_manager"):
+            env.unwrapped.curriculum_manager.compute()
+        if hasattr(env.unwrapped, "command_manager"):
+            env.unwrapped.command_manager.reset()
 
     # dump the configuration into log-directory
     dump_yaml(os.path.join(log_dir, "params", "env.yaml"), env_cfg)
