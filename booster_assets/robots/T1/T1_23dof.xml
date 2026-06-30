@@ -1,5 +1,8 @@
 <mujoco model="T1">
   <compiler angle="radian" meshdir="meshes/" autolimits="true"/>
+  <default>
+    <geom friction="1.0 0.5 0.5"/>
+  </default>
 
   <asset>
     <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="512"/>
@@ -36,7 +39,7 @@
   <worldbody>
     <light directional="true" diffuse=".4 .4 .4" specular="0.1 0.1 0.1" pos="0 0 5.0" dir="0 0 -1" castshadow="false" />
     <light directional="true" diffuse=".6 .6 .6" specular="0.2 0.2 0.2" pos="0 0 4" dir="0 0 -1" />
-    <geom name="ground" type="plane" pos="0 0 0" size="0 0 1" material="matplane" condim="1"/>
+    <geom name="ground" type="plane" pos="0 0 0" size="0 0 1" material="matplane" condim="4" friction="1.0 0.5 0.5"/>
 
     <body name="Trunk" pos="0 0 0.7">
       <inertial pos="0.055138 -1.42184e-06 0.105043" quat="0.999959 1.39867e-05 -0.00902028 -1.39205e-05" mass="11.7016" diaginertia="0.0915734 0.0768118 0.0556067"/>
@@ -132,13 +135,13 @@
                 <geom size="0.05 0.04 0.07" pos="0 0 -0.15" type="box" rgba="0.4 0.4 0.4 0."/>
                 <body name="Ankle_Cross_Left" pos="0 0 -0.28">
                   <inertial pos="-0.003722 0 -0.007981" quat="0.443136 0.551027 0.551027 0.443136" mass="0.073" diaginertia="2.9e-05 2.56589e-05 1.13411e-05"/>
-                  <joint name="Left_Ankle_Pitch" pos="0 0 0" axis="0 1 0" range="-0.87 0.35" armature="0.05"/>
+                  <joint name="Left_Ankle_Pitch" pos="0 0 0" axis="0 1 0" range="-0.87 0.35" armature="0.0679104"/>
                   <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="0.4 0.4 0.4 1." mesh="Ankle_Cross_Left"/>
                   <body name="left_foot_link" pos="0 0.00025 -0.012">
                     <inertial pos="-0.000249 0 -0.00914" quat="0 0.651138 0 0.75896" mass="0.685" diaginertia="0.00269361 0.002385 0.00171539"/>
-                    <joint name="Left_Ankle_Roll" pos="0 0 0" axis="1 0 0" range="-0.44 0.44" armature="0.05"/>
+                    <joint name="Left_Ankle_Roll" pos="0 0 0" axis="1 0 0" range="-0.44 0.44" armature="0.0679104"/>
                     <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="0.4 0.4 0.4 1." mesh="left_foot_link"/>
-                    <geom size="0.112434 0.05 0.02183" pos="0.0101079 0 -0.0214208" type="box" rgba="0.4 0.4 0.4 0."/>
+                    <geom size="0.112434 0.05 0.02183" pos="0.0101079 0 -0.0214208" type="box" rgba="0.4 0.4 0.4 0." friction="1.0 0.5 0.5"/>
                   </body>
                 </body>
               </body>
@@ -167,13 +170,13 @@
                 <geom size="0.05 0.04 0.07" pos="0 0 -0.15" type="box" rgba="0.4 0.4 0.4 0."/>
                 <body name="Ankle_Cross_Right" pos="0 0 -0.28">
                   <inertial pos="-0.003722 0 -0.007981" quat="0.443136 0.551027 0.551027 0.443136" mass="0.073" diaginertia="2.9e-05 2.56589e-05 1.13411e-05"/>
-                  <joint name="Right_Ankle_Pitch" pos="0 0 0" axis="0 1 0" range="-0.87 0.35" armature="0.05"/>
+                  <joint name="Right_Ankle_Pitch" pos="0 0 0" axis="0 1 0" range="-0.87 0.35" armature="0.0679104"/>
                   <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="0.4 0.4 0.4 1." mesh="Ankle_Cross_Right"/>
                   <body name="right_foot_link" pos="0 -0.00025 -0.012">
                     <inertial pos="-0.000248 0 -0.00914" quat="0 0.651138 0 0.75896" mass="0.685" diaginertia="0.00269361 0.002385 0.00171539"/>
-                    <joint name="Right_Ankle_Roll" pos="0 0 0" axis="1 0 0" range="-0.44 0.44" armature="0.05"/>
+                    <joint name="Right_Ankle_Roll" pos="0 0 0" axis="1 0 0" range="-0.44 0.44" armature="0.0679104"/>
                     <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="0.4 0.4 0.4 1." mesh="right_foot_link"/>
-                    <geom size="0.112434 0.05 0.02183" pos="0.0101079 0 -0.0214208" type="box" rgba="0.4 0.4 0.4 0."/>
+                    <geom size="0.112434 0.05 0.02183" pos="0.0101079 0 -0.0214208" type="box" rgba="0.4 0.4 0.4 0." friction="1.0 0.5 0.5"/>
                   </body>
                 </body>
               </body>
@@ -186,27 +189,27 @@
   <actuator>
     <motor name="AAHead_yaw" joint="AAHead_yaw" forcerange="-7.0 7.0"/>
     <motor name="Head_pitch" joint="Head_pitch" forcerange="-7.0 7.0"/>
-    <motor name="Left_Shoulder_Pitch" joint="Left_Shoulder_Pitch" forcerange="-18.0 18.0"/>
-    <motor name="Left_Shoulder_Roll" joint="Left_Shoulder_Roll" forcerange="-18.0 18.0"/>
-    <motor name="Left_Elbow_Pitch" joint="Left_Elbow_Pitch" forcerange="-18.0 18.0"/>
-    <motor name="Left_Elbow_Yaw" joint="Left_Elbow_Yaw" forcerange="-18.0 18.0"/>
-    <motor name="Right_Shoulder_Pitch" joint="Right_Shoulder_Pitch" forcerange="-18.0 18.0"/>
-    <motor name="Right_Shoulder_Roll" joint="Right_Shoulder_Roll" forcerange="-18.0 18.0"/>
-    <motor name="Right_Elbow_Pitch" joint="Right_Elbow_Pitch" forcerange="-18.0 18.0"/>
-    <motor name="Right_Elbow_Yaw" joint="Right_Elbow_Yaw" forcerange="-18.0 18.0"/>
-    <motor name="Waist" joint="Waist" forcerange="-25.0 25.0"/>
-    <motor name="Left_Hip_Pitch" joint="Left_Hip_Pitch" forcerange="-45.0 45.0"/>
-    <motor name="Left_Hip_Roll" joint="Left_Hip_Roll" forcerange="-25.0 25.0"/>
-    <motor name="Left_Hip_Yaw" joint="Left_Hip_Yaw" forcerange="-25.0 25.0"/>
-    <motor name="Left_Knee_Pitch" joint="Left_Knee_Pitch" forcerange="-60.0 60.0"/>
-    <motor name="Left_Ankle_Pitch" joint="Left_Ankle_Pitch" forcerange="-24.0 24.0"/>
-    <motor name="Left_Ankle_Roll" joint="Left_Ankle_Roll" forcerange="-15.0 15.0"/>
-    <motor name="Right_Hip_Pitch" joint="Right_Hip_Pitch" forcerange="-45.0 45.0"/>
-    <motor name="Right_Hip_Roll" joint="Right_Hip_Roll" forcerange="-25.0 25.0"/>
-    <motor name="Right_Hip_Yaw" joint="Right_Hip_Yaw" forcerange="-25.0 25.0"/>
-    <motor name="Right_Knee_Pitch" joint="Right_Knee_Pitch" forcerange="-60.0 60.0"/>
-    <motor name="Right_Ankle_Pitch" joint="Right_Ankle_Pitch" forcerange="-24.0 24.0"/>
-    <motor name="Right_Ankle_Roll" joint="Right_Ankle_Roll" forcerange="-15.0 15.0"/>
+    <motor name="Left_Shoulder_Pitch" joint="Left_Shoulder_Pitch" forcerange="-38.3 38.3"/>
+    <motor name="Left_Shoulder_Roll" joint="Left_Shoulder_Roll" forcerange="-38.3 38.3"/>
+    <motor name="Left_Elbow_Pitch" joint="Left_Elbow_Pitch" forcerange="-38.3 38.3"/>
+    <motor name="Left_Elbow_Yaw" joint="Left_Elbow_Yaw" forcerange="-38.3 38.3"/>
+    <motor name="Right_Shoulder_Pitch" joint="Right_Shoulder_Pitch" forcerange="-38.3 38.3"/>
+    <motor name="Right_Shoulder_Roll" joint="Right_Shoulder_Roll" forcerange="-38.3 38.3"/>
+    <motor name="Right_Elbow_Pitch" joint="Right_Elbow_Pitch" forcerange="-38.3 38.3"/>
+    <motor name="Right_Elbow_Yaw" joint="Right_Elbow_Yaw" forcerange="-38.3 38.3"/>
+    <motor name="Waist" joint="Waist" forcerange="-68.0 68.0"/>
+    <motor name="Left_Hip_Pitch" joint="Left_Hip_Pitch" forcerange="-96.0 96.0"/>
+    <motor name="Left_Hip_Roll" joint="Left_Hip_Roll" forcerange="-68.0 68.0"/>
+    <motor name="Left_Hip_Yaw" joint="Left_Hip_Yaw" forcerange="-68.0 68.0"/>
+    <motor name="Left_Knee_Pitch" joint="Left_Knee_Pitch" forcerange="-130.0 130.0"/>
+    <motor name="Left_Ankle_Pitch" joint="Left_Ankle_Pitch" forcerange="-76.0 76.0"/>
+    <motor name="Left_Ankle_Roll" joint="Left_Ankle_Roll" forcerange="-76.0 76.0"/>
+    <motor name="Right_Hip_Pitch" joint="Right_Hip_Pitch" forcerange="-96.0 96.0"/>
+    <motor name="Right_Hip_Roll" joint="Right_Hip_Roll" forcerange="-68.0 68.0"/>
+    <motor name="Right_Hip_Yaw" joint="Right_Hip_Yaw" forcerange="-68.0 68.0"/>
+    <motor name="Right_Knee_Pitch" joint="Right_Knee_Pitch" forcerange="-130.0 130.0"/>
+    <motor name="Right_Ankle_Pitch" joint="Right_Ankle_Pitch" forcerange="-76.0 76.0"/>
+    <motor name="Right_Ankle_Roll" joint="Right_Ankle_Roll" forcerange="-76.0 76.0"/>
   </actuator>
   <sensor>
     <framequat name="orientation" objtype="site" noise="0.001" objname="imu" />

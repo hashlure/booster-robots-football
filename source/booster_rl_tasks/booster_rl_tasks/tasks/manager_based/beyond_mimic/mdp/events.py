@@ -79,6 +79,61 @@ def randomize_joint_default_pos(
         env.action_manager.get_term("joint_pos")._offset[env_ids, joint_ids] = pos
 
 
+def randomize_actuator_params(
+    env: ManagerBasedEnv,
+    env_ids: torch.Tensor | None,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+    effort_limit_range: tuple[float, float] = (0.85, 1.15),
+    velocity_limit_range: tuple[float, float] = (0.85, 1.15),
+    knee_velocity_range: tuple[float, float] = (0.85, 1.15),
+    armature_range: tuple[float, float] = (0.80, 1.20),
+):
+    """Randomly scale actuator parameters (effort/velocity/knee/armature) per-env at reset.
+
+    This mimics manufacturing variance and motor aging for sim2real robustness.
+
+    Args:
+        effort_limit_range: min/max scale factor for torque limits.
+        velocity_limit_range: min/max scale factor for velocity limits.
+        knee_velocity_range: min/max scale factor for knee point velocities.
+        armature_range: min/max scale factor for armature.
+    """
+    asset: Articulation = env.scene[asset_cfg.name]
+    if env_ids is None:
+        env_ids = torch.arange(env.scene.num_envs, device=asset.device)
+    device = asset.device
+
+    for act_name, actuator in asset.actuators.items():
+        cfg = actuator.cfg
+        # These are per-joint dicts or scalars. Handle both.
+        for attr_name, scale_range in [
+            ("effort_limit_sim", effort_limit_range),
+            ("velocity_limit_sim", velocity_limit_range),
+            ("knee_point_velocity", knee_velocity_range),
+            ("armature", armature_range),
+        ]:
+            val = getattr(cfg, attr_name, None)
+            if val is None:
+                continue
+            lo, hi = scale_range
+            scale = lo + (hi - lo) * torch.rand(len(env_ids), device=device)
+            if isinstance(val, dict):
+                new_val = {}
+                for jn, v in val.items():
+                    new_val[jn] = v * scale[0] if isinstance(v, (int, float)) else v * scale
+                setattr(cfg, attr_name, new_val)
+            elif isinstance(val, (int, float)):
+                setattr(cfg, attr_name, val * scale[0])
+            # Re-compute stiffness/damping if armature changed
+            if attr_name == "armature" and hasattr(cfg, "booster_joint_cfgs"):
+                for jn, jc in (cfg.booster_joint_cfgs.items() if isinstance(cfg.booster_joint_cfgs, dict) else {}):
+                    jc.armature *= scale[0]
+                    if jc.stiffness is not None:
+                        w = 2 * 3.1415926535 * jc.natural_freq
+                        jc.stiffness = jc.armature * w ** 2
+                        jc.damping = 2 * jc.damping_ratio * jc.armature * w
+
+
 def randomize_rigid_body_com(
     env: ManagerBasedEnv,
     env_ids: torch.Tensor | None,

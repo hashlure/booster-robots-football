@@ -74,6 +74,46 @@ def feet_air_time(
     reward *= torch.norm(env.command_manager.get_command(command_name), dim=1) > 0.2
     return reward
 
+def zero_cmd_penalty(
+    env: ManagerBasedRLEnv,
+    command_name: str,
+    command_threshold: float = 0.1,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+) -> torch.Tensor:
+    """Strong multi-term penalty when cmd≈0: penalize any motion from default pose.
+
+    Active only when ||cmd|| < command_threshold.
+    Penalizes: base lin_vel, base ang_vel, orientation tilt, joint vel, action rate.
+    """
+    cmd = env.command_manager.get_command(command_name)
+    cmd_norm = torch.norm(cmd, dim=1)
+    active = (cmd_norm < command_threshold).float()
+
+    asset: Articulation = env.scene[asset_cfg.name]
+
+    # 1. Base linear velocity (should be 0 when standing)
+    lin_vel_pen = torch.sum(torch.square(asset.data.root_lin_vel_b), dim=1)
+
+    # 2. Base angular velocity (should be 0)
+    ang_vel_pen = torch.sum(torch.square(asset.data.root_ang_vel_b), dim=1)
+
+    # 3. Orientation deviation from upright (pg should be [0,0,-1])
+    pg = asset.data.projected_gravity_b
+    pg_dev = torch.square(pg[:, 0]) + torch.square(pg[:, 1])  # pg_x^2 + pg_y^2
+
+    # 4. Joint velocity penalty
+    jvel_pen = torch.sum(torch.square(asset.data.joint_vel), dim=1)
+
+    # 5. Action rate (penalize sudden action changes)
+    act = env.action_manager.action
+    prev_act = getattr(env.action_manager, '_prev_action', torch.zeros_like(act))
+    act_rate = torch.sum(torch.square(act - prev_act), dim=1)
+
+    # Combine (all are positive, so active mask zeroes them when cmd>threshold)
+    penalty = active * (lin_vel_pen + 0.5 * ang_vel_pen + 2.0 * pg_dev + 0.1 * jvel_pen + 0.05 * act_rate)
+    return penalty
+
+
 def stand_still(
     env: ManagerBasedRLEnv,
     command_name: str,

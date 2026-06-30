@@ -208,7 +208,11 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         if hasattr(env.unwrapped, "curriculum_manager"):
             env.unwrapped.curriculum_manager.compute()
         if hasattr(env.unwrapped, "command_manager"):
-            env.unwrapped.command_manager.reset()
+            try:
+                env.unwrapped.command_manager.reset()
+            except TypeError:
+                import torch
+                env.unwrapped.command_manager.reset(torch.arange(env_cfg.scene.num_envs, device=env_cfg.sim.device))
 
     # dump the configuration into log-directory
     dump_yaml(os.path.join(log_dir, "params", "env.yaml"), env_cfg)
